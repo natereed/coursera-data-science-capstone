@@ -32,6 +32,16 @@ rm(news_subset, blogs_subset, twitter_subset)
 # Clean
 combined_doc <- iconv(combined_doc, 'utf-8', 'ascii', sub='')
 
+# Create test and train subsets
+# Split into test/train
+split = 0.70
+train_ind <- sample(length(combined_doc),
+                    size=split * length(combined_doc))
+train_subset <- combined_doc[train_ind]
+test_subset <- combined_doc[-train_ind]
+rm(train_ind)
+rm(combined_doc)
+
 if (!file.exists("swearwords.txt")) {
   download.file(url="https://s3.amazonaws.com/natereed-coursera/swearwords.txt", 
                 destfile="swearwords.txt",
@@ -78,8 +88,13 @@ cleaning_tokenizer <- function(v) {
     strip_profanity
 } 
 
-build_vocab <- function(n) {
-  it <- itoken(combined_doc, 
+calc_probabilities <- function(vocab) {
+  vocab$p <- vocab$terms_counts / sum(vocab$terms_counts)
+  return(vocab)
+}
+
+build_vocab <- function(n, text_vec) {
+  it <- itoken(text_vec, 
                preprocess_function = tolower, 
                tokenizer = cleaning_tokenizer);
 
@@ -89,41 +104,33 @@ build_vocab <- function(n) {
   vocab <- create_vocabulary(it, ngram=c(n, n));
   t <- proc.time() - t
   print(paste(t[['elapsed']], "seconds."))
-  return(vocab[[1]])
+  vocab <- vocab[[1]]
+  return(calc_probabilities(vocab))
 }
 
-calc_probabilities <- function(vocab) {
-  vocab$p <- vocab$terms_counts / sum(vocab$terms_counts)
-  return(vocab)
-}
-
-v <- lapply(seq(1,4), build_vocab)
-vocab <- rbindlist(lapply(v, calc_probabilities))
-rm(v)
-rm(combined_doc)
+train_vocab <- list(build_vocab(1, train_subset),
+                    build_vocab(2, train_subset),
+                    build_vocab(3, train_subset),
+                    build_vocab(4, train_subset))
+train_vocab <- rbindlist(train_vocab)
+test_vocab <- build_vocab(4, test_subset)
+rm(train_subset)
+rm(test_subset)
 rm(swear_words)
 
+library(feather)
 # Store terms and term counts on disk
-print("Converting to data.table...")
-t <- proc.time()
-vocab_dt <- data.table(terms=vocab$terms,
+store_vocab <- function(vocab, filename) {
+  print("Converting to data.table...")
+  t <- proc.time()
+  vocab_dt <- data.table(terms=vocab$terms,
                        term_count = vocab$terms_counts,
                        doc_count=vocab$doc_count,
                        p=vocab$p)
-t <- proc.time() - t
-print(paste(t[['elapsed']], "seconds."))
+  t <- proc.time() - t
+  print(paste(t[['elapsed']], "seconds."))
+  write_feather(vocab, filename)
+}
 
-rm(vocab)
-
-# Split into test/train
-split = 0.70
-train_ind <- sample(nrow(vocab_dt),
-                    size=split * nrow(vocab_dt))
-train_subset <- vocab_dt[train_ind,]
-test_subset <- vocab_dt[-train_ind]
-rm(train_ind)
-rm(vocab_dt)
-
-library(feather)
-write_feather(train_subset, "train.feather")
-write_feather(test_subset, "test.feather")
+store_vocab(train_vocab, "train.feather")
+store_vocab(test_vocab, "test.feather")

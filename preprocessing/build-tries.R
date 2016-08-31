@@ -1,8 +1,10 @@
-print("Building trie...")
+print("Loading training data...")
+read_feather("train.feather")
 
-num_records_to_load <- 100000
+print("Building trie...")
+num_records_to_load <- nrow(train_vocab)
 chunk_size <- 50000
-records_to_load <- train_subset[1:num_records_to_load,]
+records_to_load <- train_vocab[1:num_records_to_load,]
 #rm(train_subset)
 
 chunk_apply <- function(chunkable, chunk_size, size_of_fun, chunk_fun) {
@@ -41,4 +43,4 @@ t <- proc.time()
 chunk_apply(records_to_load, chunk_size=chunk_size, size_of_fun=nrow, chunk_fun=load_records)
 t <- proc.time() - t
 
-#save(trie, file="trie.data")
+save(trie, file="trie.data")

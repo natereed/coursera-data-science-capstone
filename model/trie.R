@@ -17,7 +17,7 @@ insert <- function(trie, ngram) {
     
     # Last entry?
     if (i == n) {
-      entry[['p']] = p
+      entry[['$p']] <- p
     }
   }
 }
