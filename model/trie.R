@@ -7,7 +7,6 @@ insert <- function(trie, ngram) {
   node <- trie
   for (i in 1:n) {
     token <- tokens[i]
-    #print(paste("Token: ", token))
     entry <- node[[token]]
     if (is.null(entry)) {
       entry <- new.env()

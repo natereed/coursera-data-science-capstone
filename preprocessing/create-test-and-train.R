@@ -15,7 +15,7 @@ blogs_data  <- readLines(blogs_path, encoding='UTF-8')
 twitter_data    <- readLines(twitter_path, encoding='UTF-8')
 
 # Subset
-sample_size <- 0.05
+sample_size <- 0.01
 set.seed(1234)
 news_subset <- sample(news_data, length(news_data) * sample_size)
 rm(news_data)
@@ -132,5 +132,6 @@ store_vocab <- function(vocab, filename) {
   write_feather(vocab, filename)
 }
 
-store_vocab(train_vocab, "train.feather")
-store_vocab(test_vocab, "test.feather")
+saveRDS(train_vocab, "train.RDS")
+saveRDS(test_vocab, "test.RDS")
+

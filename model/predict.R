@@ -1,17 +1,14 @@
-#load("trie.data")
+get_regex <- function(input) {
+  return(paste(paste("^", input, sep=""), "_", sep=""))
+}
 
-predict <- function(trie, ngram) {
-  matches <- names(get(trie, ngram))
-  f <- function(match) {
-    print(paste("Looking up", match))
-    if (match != '$p') {
-      p <- trie[[ngram]][[match]]$`$p`
-      print(p)
-      return(p)
-    }
+find_matches <- function(ngram, vocab_dt) {
+  pat <- get_regex(ngram)
+  matches <- vocab_dt[grep(pat, vocab_dt$terms),]
+  if (nrow(matches) > 0) {
+    return(matches[which.min(matches$p),])
+  } else {
+    return(NULL)
   }
-  p <- sapply(matches, f)
-  arrange(p)
-  
 }
 

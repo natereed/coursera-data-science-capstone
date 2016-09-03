@@ -2,7 +2,7 @@ print("Loading training data...")
 read_feather("train.feather")
 
 print("Building trie...")
-num_records_to_load <- nrow(train_vocab)
+num_records_to_load <- 200000 #nrow(train_vocab)
 chunk_size <- 50000
 records_to_load <- train_vocab[1:num_records_to_load,]
 #rm(train_subset)
