@@ -15,7 +15,7 @@ blogs_data  <- readLines(blogs_path, encoding='UTF-8')
 twitter_data    <- readLines(twitter_path, encoding='UTF-8')
 
 # Subset
-sample_size <- 0.01
+sample_size <- 0.05
 set.seed(1234)
 news_subset <- sample(news_data, length(news_data) * sample_size)
 rm(news_data)
@@ -108,12 +108,14 @@ build_vocab <- function(n, text_vec) {
   return(calc_probabilities(vocab))
 }
 
-train_vocab <- list(build_vocab(1, train_subset),
-                    build_vocab(2, train_subset),
-                    build_vocab(3, train_subset),
-                    build_vocab(4, train_subset))
-train_vocab <- rbindlist(train_vocab)
+unigrams <- build_vocab(1, train_subset)
+bigrams <- build_vocab(2, train_subset)
+trigrams <- build_vocab(3, train_subset)
+quadgrams <- build_vocab(4, train_subset)
+vocabs <- list(unigrams, bigrams, trigrams, quadgrams)
+
 test_vocab <- build_vocab(4, test_subset)
+
 rm(train_subset)
 rm(test_subset)
 rm(swear_words)
@@ -132,6 +134,13 @@ store_vocab <- function(vocab, filename) {
   write_feather(vocab, filename)
 }
 
-saveRDS(train_vocab, "train.RDS")
-saveRDS(test_vocab, "test.RDS")
+dir.create(file.path(getwd(), "data", "model"), showWarnings = FALSE)
+dir.create(file.path(getwd(), "data", "test"), showWarnings = FALSE)
+
+saveRDS(unigrams, "data/model/unigrams.RDS")
+saveRDS(bigrams, "data/model/bigrams.RDS")
+saveRDS(trigrams, "data/model/trigrams.RDS")
+saveRDS(quadgrams, "data/model/quadgrams.RDS")
+
+saveRDS(test_vocab, "data/test.RDS")
 
