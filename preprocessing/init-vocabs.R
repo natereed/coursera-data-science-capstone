@@ -2,6 +2,8 @@ library(text2vec)
 library(tm)
 library(data.table)
 
+t <- proc.time()
+
 # Load data
 setwd( file.path("C:/", "Users", "Owner", "Projects", "Coursera", "Data Science Capstone"))
 
@@ -15,7 +17,7 @@ blogs_data  <- readLines(blogs_path, encoding='UTF-8')
 twitter_data    <- readLines(twitter_path, encoding='UTF-8')
 
 # Subset
-sample_size <- 0.05
+sample_size <- 0.30
 set.seed(1234)
 news_subset <- sample(news_data, length(news_data) * sample_size)
 rm(news_data)
@@ -34,7 +36,7 @@ combined_doc <- iconv(combined_doc, 'utf-8', 'ascii', sub='')
 
 # Create test and train subsets
 # Split into test/train
-split = 0.70
+split = 0.9
 train_ind <- sample(length(combined_doc),
                     size=split * length(combined_doc))
 train_subset <- combined_doc[train_ind]
@@ -100,10 +102,7 @@ build_vocab <- function(n, text_vec) {
 
   # Create vocab from iterator
   print(paste("Initializing vocabulary for n=", n))
-  t <- proc.time()
   vocab <- create_vocabulary(it, ngram=c(n, n));
-  t <- proc.time() - t
-  print(paste(t[['elapsed']], "seconds."))
   vocab <- vocab[[1]]
   return(calc_probabilities(vocab))
 }
@@ -124,13 +123,10 @@ library(feather)
 # Store terms and term counts on disk
 store_vocab <- function(vocab, filename) {
   print("Converting to data.table...")
-  t <- proc.time()
   vocab_dt <- data.table(terms=vocab$terms,
                        term_count = vocab$terms_counts,
                        doc_count=vocab$doc_count,
                        p=vocab$p)
-  t <- proc.time() - t
-  print(paste(t[['elapsed']], "seconds."))
   write_feather(vocab, filename)
 }
 
@@ -143,4 +139,6 @@ saveRDS(trigrams, "data/model/trigrams.RDS")
 saveRDS(quadgrams, "data/model/quadgrams.RDS")
 
 saveRDS(test_vocab, "data/test.RDS")
+t <- proc.time() - t
+print(paste(t[['elapsed']], "seconds."))
 

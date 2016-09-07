@@ -57,4 +57,14 @@ predict <- function(ngram) {
   }
 }
 
-vocabs <- load_vocabs();
+get_last_word <- function(ngram) {
+  words <- strsplit(ngram, '_')[[1]]
+  return(words[length(words)])
+}
+
+predict_next_word <- function(ngram) {
+  prediction <- predict(ngram)
+  return(get_last_word(prediction$terms))
+}
+
+#vocabs <- load_vocabs();
