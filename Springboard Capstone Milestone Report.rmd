@@ -1,0 +1,111 @@
+---
+title: "Developing a Predictive Model for Text: Milestone Report"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+This Capstone Project involves analyzing a body of text provided by SwiftKey for the purpose of developing an accurate predictive model for sequences of words (n-grams). 
+
+The client for this is the developer of a smart keyboard app seeking to create an intelligent auto-complete feature that suggests sentence completions as users type. The accuracy and speed of the predictions are important, as users have come to expect this functionality in nearly all interactive text-based applications -- search engines, "soft" keyboards, etc.
+
+## Data
+
+The data is raw text, scraped or acquired from a variety of news websites, blogs and twitter feeds. It is important to emphasize this is unstructured natural language text. 
+
+Getting and cleaning the data involved a few steps:
+
+* Converting all text to lowercase
+* Tokenization: Breaking down text into constituents (words, punctuation)
+* Removing twitter hash characters (#)
+* Removing url's
+* Removing email addresses
+* Translating "textse" or "SMS chat lingo" into English words. Some translations for commonly used phrases were borrowed from [this site](https://www.opentextingonline.com/textspeak.aspx). 
+* Stripping profanity. For this, a [list of banned words](http://www.bannedwordlist.com/) was used.
+
+The text2vec library was used to perform the tokenization and cleaning described above to create vocabularies for n=1 to 4. Then the vocabularies were converted into data.table objects. Data.table is an efficient implementation of R data frames, that offers potentially improved access time.
+
+Next, a probability ("p") for each n-gram was computed using Maximum Likelihood Estimation. In the baseline approach, the probability of the n-gram is term_count divided by the total count of all terms in the vocabulary.
+
+Separate tables were created for each n as well as a test set:
+
+* Unigrams
+* Bigrams
+* Tri-grams
+* Quad-grams
+* Test (quad-grams)
+
+To facilitate testing and deployment of the model, the data tables were stored on disk. Here is a sample from one of these data tables:
+
+```{r cars}
+test <- readRDS(file.path("data", "test.RDS"))
+test[1:5,]
+```
+
+The most important fields are:
+
+* terms: The n-gram.
+* term_count
+* doc_count
+* p: This is the probability estimation based on term_count and sum(term_count).
+
+## Progress To-Date
+
+### The Algorithm
+
+My language model is influenced by the idea of "Markov chains". In short:
+
+* Only the previous history (preceding words) matters
+* Limited memory is needed (only previous k words are included in the history). Older words matter less.
+
+In general, the probability of a word w2 is based on the probability of this word and the probability of the history, w1.
+
+The current approach is a n-gram "backoff" model with Maximum Likelihood Estimation for the probability of each n-gram. n-grams where n<=4 are used for the history.
+
+Given a 3-gram (last three words in sentence), we lookup the most likely 4-gram that matches the n-gram. For example, "hello_my_name" matches "hellO_my_name_is". If no 4-grams match, then we recurse on the n-gram, taking the last n-1 words and using that to lookup the most likely 3-gram, and so on, until n=0. Then, the unigram with the highest frequency is returned.
+
+Significant effort was expended on developing an efficient method of storing and retrieving the n-grams in memory. Initially, data tables were used, and lookups were performed by grep'ing the terms column for substring matches.
+
+In order to improve speed and memory utilization, I tried to replace data tables with tries, implemented using R "environments." Essentially, environments are symbol tables that work like hashtables, with O(1) lookup time in the best case, and O(n) in the worst case, where n is the number of words in the n-gram. However, I found that the initialization time and the resource utilization for building tries was unworkable given the limited hardware resources I have at my disposal. Surprisingly, rather than saving space, tries used a multiple of the amount of space required to store equivalent data in a data.table. 
+
+Such an approach will not perform well in a production environment where user experience will be negatively affected. A native trie structure, or perhaps a database with full-text indexing, are potential solutions. For now, I will focus on building an accurate model that runs efficiently in memory using R data.table's. 
+
+## Problems / Limitations
+
+There are two major shortcomings with this approach:
+
+* There is no context. Perhaps the sentences are about food. "A slice of pie" might be likely but this algorithm doesn't take into account the meaning of the conversation.
+* If an n-gram has not been seen before, it will be assumed to have zero probability. Novel n-grams are assigned zero probability even though they might be likely given the context. "Backoff" somewhat alleviates this problem, by relying on the likelihood of the n-gram defined by n-1.
+
+## Performance
+
+I tested the model by sampling a percentage of the text corpora, splitting this into random train and test sets (90/10), then running the prediction method on 100 4-grams in the test set. This might not be considered a full test, but the running time of the prediction method made it impractical to quickly test very large sets.
+
+Sample Size (%) | Init Time | Avg. Lookup Time (s) | Accuracy | Memory (KB) | Disk (KB)
+----------------|-----------|----------------------|----------|-------------|
+ 10             | 1020.08	  | 2.97                 | 0.07	    | 2182	      | 106317
+ 20             | 1774.86   | 6.34                 | 0.1      | 4583        | 202190
+ 30             | 2768.38   | 7.8                  | 0.09     | 4957        | 291780
+
+Since I would like to keep the memory consumption under 8 GB (the deployment environment, shinyapps.io, supports 8GB at most, for commercial accounts), I need to limit the sample size. In addition, it does not appear that using a large sample improves accuracy. O(n) lookup time in data.tables limits the sample size, too. Lookup times were taking nearly 8 seconds with 30% of the corpora, using nearly 5GB.
+
+In the future, I might test the accuracy of the algorithm by just testing p. It's possible to parallelize such a test and obtain a result for a much larger set of data in the test/holdout set.
+
+## Possible Improvements
+
+* Correct the MLE. My MLE calculation is incorrect. The probability of a given n-gram w1, w2 is P(w2, w1) = count(w1, w2) / count(w1). In other words, the total number of occurences of w1 followed by w2 (the bi-gram count, for example), divided by the total number of w1 (the unigram count). 
+
+* Permute the vocabulary, generating and storing all possible n-grams, not just the ones seen.
+
+* Smoothing methods: MLE does not predict the likelihood of "unseen" n-grams. They would be assigned zero probability using this method. Various smoothing methods exist that estimate the probability of "possible" n-grams. These methods (Add-One, Add-Alpha, Good-Turning) takes into account history size (total number of n-grams seen), vocabulary size (number of distinct words), and n-gram count.
+
+* Construct a simple n-gram model using one of the smoothing methods above, and see if the accuracy is improved.
+
+I am still in the process of investigating smoothing and interpolation methods.
+
+
+
